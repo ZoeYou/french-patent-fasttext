@@ -39,30 +39,36 @@ if __name__ == '__main__':
         except FileExistsError:
             print(f"{output_path} already exists!")
 
-    # corpus pre-processing
-    df = pd.read_csv(args.in_file, dtype=str, engine="python")
-    dict_target_secs = {'title': 'title', 'abstract': 'abs', 'claims': 'claims', 'description': 'desc'}
-    target_sections = [dict_target_secs[s] for s in args.section_type]
+    corpus_file = os.path.join(output_path, 'train.cor')
+    if not Path(corpus_file).exists():
+        # corpus pre-processing
+        df = pd.read_csv(args.in_file, dtype=str, engine="python")
+        dict_target_secs = {'title': 'title', 'abstract': 'abs', 'claims': 'claims', 'description': 'desc'}
+        target_sections = [dict_target_secs[s] for s in args.section_type]
 
-    for sec in target_sections:
-        df.loc[:,sec] = df[sec].apply(str)
-    df.loc[:,'text'] = df[target_sections].apply('\n'.join, axis=1)
-    lines = df['text'].tolist()
+        for sec in target_sections:
+            df.loc[:,sec] = df[sec].apply(str)
+        df.loc[:,'text'] = df[target_sections].apply('\n'.join, axis=1)
+        lines = df['text'].tolist()
 
-    # tokenize
-    lines = [[token for token in re.split(r' |\.|\;|\,', l) if token != ''] for l in lines]
-    print('Number of lines:', len(lines))
+        # tokenize
+        lines = [[token for token in re.split(r' |\.|\;|\,', l) if token != ''] for l in lines]
+        print('Number of lines:', len(lines))
 
-    # save corpus 
-    corpus_file = os.path.join(output_path, 'train.cor') 
-    with open(corpus_file, 'w') as out_f:
-        out_f.write('\n'.join([' '.join(l) for l in lines]))
+        # save corpus 
+        with open(corpus_file, 'w') as out_f:
+            out_f.write('\n'.join([' '.join(l) for l in lines]))
 
-    # train the model
-    model = fasttext.train_unsupervised(corpus_file, minn=2, maxn=5, dim=args.dim)
+
+    model_file = os.path.join(output_path, 'model_ft.bin')
+    if not Path(model_file).exists():
+        # train the model
+        model = fasttext.train_unsupervised(corpus_file, minn=2, maxn=5, dim=args.dim)
+        # save model
+        model.save_model(model_file)
+
 
     # save model as vec
-    modeL_file = os.path.join(output_path, 'model_ft.bin')
     model = load_model(model_file)
 
     # get all words from model
@@ -72,7 +78,7 @@ if __name__ == '__main__':
     vec_file = os.path.join(output_path, 'model_ft.vec')
     with open(vec_file, 'w') as file_out:
     # the first line must contain number of total words and vector dimension
-        file_out.write(str(len(words)) + " " + str(f.get_dimension()) + "\n")
+        file_out.write(str(len(words)) + " " + str(model.get_dimension()) + "\n")
 
         # line by line, you append vectors to VEC file
         for w in words:
